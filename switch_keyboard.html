@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Accessible Switch Keyboard</title>
+    <style>
+        :root {
+            --bg-color: #f4f7f6;
+            --text-color: #1a252f;
+            --card-color: #ffffff;
+            --accent-color: #3498db;
+            --highlight-color: #e67e22; 
+            --select-color: #2ecc71;
+            --key-bg: #eaeded;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            box-sizing: border-box;
+            
+            /* Extra-large, high-contrast custom mouse pointer (Cyan with thick black border) */
+            cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64' viewBox='0 0 64 64'%3E%3Cpath d='M0 0 L24 48 L34 34 L48 24 Z' fill='%2300ffff' stroke='%23000000' stroke-width='3' stroke-linejoin='miter'/%3E%3C/svg%3E"), auto;
+        }
+
+        /* Ensure all clickable areas maintain the oversized custom cursor */
+        button, select, .key-row-col, .key, .predict-box, .btn {
+            cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64' viewBox='0 0 64 64'%3E%3Cpath d='M0 0 L24 48 L34 34 L48 24 Z' fill='%2300ffff' stroke='%23000000' stroke-width='3' stroke-linejoin='miter'/%3E%3C/svg%3E"), pointer !important;
+        }
+
+        .container {
+            max-width: 1200px; /* Expanded for a real wide desktop keyboard aesthetic */
+            width: 100%;
+            background: var(--card-color);
+            padding: 30px;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        h1 {
+            text-align: center;
+            margin: 0;
+            color: var(--accent-color);
+            font-size: 2rem;
+        }
+
+        .instructions {
+            text-align: center;
+            color: #5d6d7e;
+            font-size: 1.1rem;
+            margin-bottom: 5px;
+            background: #eef2f5;
+            padding: 12px;
+            border-radius: 8px;
+            font-weight: 600;
+            user-select: none;
+        }
+
+        .text-window-wrapper {
+            position: relative;
+            width: 100%;
+        }
+
+        /* High-Visibility Trackpad for the visually impaired */
+        .text-window {
+            width: 100%;
+            height: 160px; /* Taller visibility window */
+            border: 4px solid #7f8c8d; /* Thicker high-contrast border */
+            border-radius: 12px;
+            padding: 20px;
+            font-size: 36px; /* Greatly enlarged text size */
+            font-weight: 800; /* Extra bold weighting for legibility */
+            letter-spacing: 1px;
+            line-height: 1.4;
+            box-sizing: border-box;
+            background: #ffffff;
+            word-wrap: break-word;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            color: #000000; /* Pure black on white for ultimate contrast */
+            font-family: inherit;
+            outline: none;
+            resize: none;
+        }
+
+        .prediction-row {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+            height: 60px;
+            user-select: none;
+        }
+
+        .predict-box {
+            background: #e1f0fa;
+            border: 2px solid transparent;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            font-weight: bold;
+            color: #1b4f72;
+            transition: all 0.1s ease;
+        }
+
+        /* 6x6 Wide Desktop Profile Setup */
+        .keyboard-grid {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 14px;
+            background: #bdc3c7;
+            padding: 20px;
+            border-radius: 16px;
+            user-select: none;
+        }
+
+        .key-row-col {
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            border-radius: 8px;
+            padding: 4px;
+            transition: background-color 0.15s ease;
+        }
+
+        .key-row-col:hover {
+            background-color: rgba(52, 152, 219, 0.2);
+        }
+
+        .key {
+            background: var(--key-bg);
+            border-radius: 8px;
+            height: 75px; /* Deeper keys for better visual target acquisition */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 26px; /* Larger key text */
+            font-weight: bold;
+            box-shadow: 0 5px 0 #95a5a6;
+            transition: all 0.1s ease;
+            position: relative;
+            color: #1c2833;
+            pointer-events: none; 
+        }
+
+        .key-row-col.active-col .key {
+            pointer-events: auto; 
+        }
+
+        .key.action {
+            background: #95a5a6;
+            color: #ffffff;
+            font-size: 16px;
+            text-transform: uppercase;
+            box-shadow: 0 5px 0 #7f8c8d;
+        }
+
+        .column-selected-scan {
+            background-color: rgba(46, 204, 113, 0.3) !important;
+        }
+
+        .key-scan-highlight {
+            background-color: var(--highlight-color) !important;
+            color: white !important;
+            box-shadow: 0 5px 0 #d35400 !important;
+        }
+
+        .predict-scan-highlight {
+            background-color: var(--highlight-color) !important;
+            color: white !important;
+        }
+
+        .key-selected-flash {
+            background-color: var(--select-color) !important;
+            color: white !important;
+            box-shadow: 0 0px 0 transparent !important;
+            transform: translateY(5px);
+        }
+
+        .settings-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #f8f9fa;
+            padding: 15px 24px;
+            border-radius: 10px;
+            border: 1px solid #cbd5e1;
+            user-select: none;
+        }
+
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 1.1rem;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            font-weight: bold;
+            font-size: 1rem;
+            border: none;
+            border-radius: 6px;
+            color: white;
+            transition: background 0.2s;
+        }
+
+        .btn-copy { background: #2ecc71; }
+        .btn-copy:hover { background: #27ae60; }
+        .btn-clear { background: #94a3b8; }
+        .btn-clear:hover { background: #64748b; }
+
+        select {
+            padding: 8px 16px;
+            font-size: 16px;
+            border-radius: 6px;
+            border: 2px solid #cbd5e1;
+            outline: none;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container" id="main-app">
+    <h1>Wide QWERTY Switch Keyboard (High-Visibility Track)</h1>
+    <div class="instructions">🖱️ Step 1: Click a column track to unlock it. <br>💡 Step 2: Confirm when lit orange. Click inside the high-visibility box below to choose your cursor edit location.</div>
+    
+    <div class="text-window-wrapper">
+        <textarea class="text-window" id="output-window" placeholder="TEXT APPEARS HERE..."></textarea>
+    </div>
+
+    <div class="prediction-row" id="prediction-container">
+        <div class="predict-box" id="pred-0" onclick="handlePredictionBoxClick(0, event)"></div>
+        <div class="predict-box" id="pred-1" onclick="handlePredictionBoxClick(1, event)"></div>
+        <div class="predict-box" id="pred-2" onclick="handlePredictionBoxClick(2, event)"></div>
+        <div class="predict-box" id="pred-3" onclick="handlePredictionBoxClick(3, event)"></div>
+    </div>
+
+    <div class="keyboard-grid" id="keyboard-matrix">
+    </div>
+
+    <div class="settings-bar">
+        <div class="control-group">
+            <label for="scan-speed"><strong>Scanning Speed:</strong></label>
+            <select id="scan-speed" onchange="updateIntervalSpeed(this.value)">
+                <option value="1500">Slow (1.5 seconds)</option>
+                <option value="1000" selected>Normal (1.0 second)</option>
+                <option value="700">Fast (0.7 seconds)</option>
+                <option value="400">Expert (0.4 seconds)</option>
+            </select>
+        </div>
+        <div class="control-group">
+            <button class="btn btn-copy" onclick="copyToClipboard(event)">Copy Text</button>
+            <button class="btn btn-clear" onclick="clearText(event)">Clear All</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    let audioCtx = null;
+    
+    function initAudio() {
+        if (!audioCtx) {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (audioCtx.state === 'suspended') {
+            audioCtx.resume();
+        }
+    }
+    
+    function playBeep(freq, type = 'sine', duration = 0.1) {
+        initAudio();
+        if (!audioCtx) return;
+        
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+        osc.start();
+        osc.stop(audioCtx.currentTime + duration);
+    }
+
+    function soundColumnSelect() { playBeep(350, 'triangle', 0.12); } 
+    function soundKeySelect() { playBeep(587.33, 'sine', 0.08); }      
+    function soundActionSelect() { playBeep(783.99, 'sine', 0.15); }   
+    function soundError() { playBeep(180, 'sawtooth', 0.15); }         
+
+    const commonWords = [
+        "the", "and", "you", "that", "was", "for", "are", "with", "his", "they", "this", 
+        "have", "from", "one", "had", "word", "what", "some", "here", "there", "when", 
+        "your", "said", "each", "time", "how", "their", "will", "about", "many", "then", 
+        "them", "write", "would", "like", "make", "these", "long", "look", "more", "could", 
+        "go", "come", "did", "my", "sound", "no", "most", "people", "over", "know", "water", 
+        "than", "call", "first", "who", "may", "down", "side", "been", "now", "find", "any", 
+        "new", "work", "part", "take", "get", "place", "made", "live", "where", "after", 
+        "back", "little", "only", "round", "man", "year", "came", "show", "every", "good", 
+        "me", "give", "our", "under", "name", "very", "through", "just", "form", "sentence", 
+        "great", "think", "say", "help", "low", "line", "before", "turn", "cause", "much", 
+        "mean", "move", "right", "boy", "old", "too", "same", "tell", "does", "set", "three", 
+        "want", "air", "well", "also", "play", "small", "end", "put", "home", "hello", "welcome",
+        "please", "thanks", "thank", "yes", "today", "tomorrow", "yesterday", "goodbye", "happy",
+        "sad", "excited", "tired", "hungry", "thirsty", "cold", "hot", "beautiful", "perfect",
+        "awesome", "amazing", "cool", "easy", "hard", "difficult", "simple", "computer", "phone",
+        "keyboard", "screen", "internet", "website", "email", "message", "friend", "family", "house",
+        "room", "school", "class", "teacher", "student", "book", "paper", "pen", "pencil", "music",
+        "song", "game", "movie", "show", "food", "breakfast", "lunch", "dinner", "snack", "water",
+        "milk", "juice", "coffee", "tea", "fruit", "apple", "banana", "bread", "cheese", "meat",
+        "help", "question", "answer", "problem", "solution", "idea", "thought", "feel", "hope",
+        "love", "wish", "need", "should", "could", "might", "must", "shall", "always", "never",
+        "sometimes", "usually", "often", "maybe", "probably", "definitely", "together", "alone",
+        "again", "stop", "start", "pause", "finish", "done", "ready", "open", "close", "left", "right"
+    ];
+
+    // Balanced 6x6 Matrix ensuring all 26 distinct alphanumeric properties are perfectly accounted for
+    const cleanSquareQwerty = [
+        ["Q", "Y", "A", "G", "Z", "SPACE"],
+        ["W", "U", "S", "H", "X", "BACK"],
+        ["E", "I", "D", "J", "C", "SPEAK"],
+        ["R", "O", "F", "K", "V", "PREDICT"],
+        ["T", "P", "L", "M", "B", "COPY"],
+        ["N", "N/A", "N/A", "N/A", "N/A", "CLEAR"] 
+    ];
+
+    let currentScanMode = "WAITING_FOR_COLUMN"; 
+    let selectedColumnIndex = -1;
+    let currentKeyIndex = -1;
+    let currentPredictionIndex = -1;
+    let scanIntervalId = null;
+    let intervalSpeed = 1000;
+
+    const gridContainer = document.getElementById('keyboard-matrix');
+    const outputArea = document.getElementById('output-window');
+
+    outputArea.addEventListener('click', (event) => {
+        event.stopPropagation();
+        initAudio();
+    });
+    
+    cleanSquareQwerty.forEach((colArray, colIdx) => {
+        const columnDiv = document.createElement('div');
+        columnDiv.className = 'key-row-col';
+        columnDiv.id = `col-${colIdx}`;
+        
+        columnDiv.onclick = function(event) {
+            event.stopPropagation();
+            selectColumnManually(colIdx);
+        };
+        
+        colArray.forEach((keyValue, keyIdx) => {
+            const keyDiv = document.createElement('div');
+            keyDiv.className = 'key';
+            if (keyValue.length > 1) keyDiv.classList.add('action');
+            keyDiv.id = `key-${colIdx}-${keyIdx}`;
+            keyDiv.innerText = keyValue;
+
+            keyDiv.onclick = function(event) {
+                event.stopPropagation();
+                if (currentScanMode === "KEY_SCANNING" && selectedColumnIndex === colIdx && currentKeyIndex === keyIdx) {
+                    processKeyValue(keyValue, colIdx, keyIdx);
+                } else {
+                    soundError(); 
+                }
+            };
+
+            columnDiv.appendChild(keyDiv);
+        });
+        gridContainer.appendChild(columnDiv);
+    });
+
+    function selectColumnManually(colIdx) {
+        initAudio(); 
+        if (currentScanMode === "KEY_SCANNING") {
+            triggerKeyboardSelection();
+            return;
+        }
+
+        soundColumnSelect();
+        currentScanMode = "KEY_SCANNING";
+        selectedColumnIndex = colIdx;
+        currentKeyIndex = 0;
+        
+        clearVisualHighlights();
+        
+        const targetCol = document.getElementById(`col-${colIdx}`);
+        targetCol.classList.add('column-selected-scan');
+        targetCol.classList.add('active-col'); 
+        
+        highlightKeyScan(selectedColumnIndex, currentKeyIndex);
+        startTimerScanning();
+    }
+
+    function startTimerScanning() {
+        clearInterval(scanIntervalId);
+        scanIntervalId = setInterval(() => {
+            removeScanHighlights();
+            
+            if (currentScanMode === "KEY_SCANNING") {
+                currentKeyIndex = (currentKeyIndex + 1) % cleanSquareQwerty[selectedColumnIndex].length;
+                highlightKeyScan(selectedColumnIndex, currentKeyIndex);
+            } else if (currentScanMode === "PREDICTION_SCANNING") {
+                currentPredictionIndex = (currentPredictionIndex + 1) % 4;
+                highlightPredictionScan(currentPredictionIndex);
+            }
+        }, intervalSpeed);
+    }
+
+    function removeScanHighlights() {
+        document.querySelectorAll('.key').forEach(k => k.classList.remove('key-scan-highlight'));
+        document.querySelectorAll('.predict-box').forEach(p => p.classList.remove('predict-scan-highlight'));
+    }
+
+    function clearVisualHighlights() {
+        removeScanHighlights();
+        document.querySelectorAll('.key-row-col').forEach(c => {
+            c.classList.remove('column-selected-scan');
+            c.classList.remove('active-col');
+        });
+    }
+
+    function highlightKeyScan(colIdx, keyIdx) {
+        const targetKey = document.getElementById(`key-${colIdx}-${keyIdx}`);
+        if (targetKey) targetKey.classList.add('key-scan-highlight');
+    }
+
+    function highlightPredictionScan(index) {
+        const targetBox = document.getElementById(`pred-${index}`);
+        if (targetBox && targetBox.innerText !== "") {
+            targetBox.classList.add('predict-scan-highlight');
+        }
+    }
+
+    document.body.onclick = function() {
+        initAudio();
+        triggerKeyboardSelection();
+    };
+
+    window.addEventListener('keydown', (e) => {
+        if (e.code === "Space") {
+            if (document.activeElement !== outputArea) {
+                e.preventDefault(); 
+                initAudio();
+                triggerKeyboardSelection();
+            }
+        }
+    });
+
+    function triggerKeyboardSelection() {
+        if (currentScanMode === "KEY_SCANNING") {
+            const selectedValue = cleanSquareQwerty[selectedColumnIndex][currentKeyIndex];
+            processKeyValue(selectedValue, selectedColumnIndex, currentKeyIndex);
+        } else if (currentScanMode === "PREDICTION_SCANNING") {
+            const selectedWordBox = document.getElementById(`pred-${currentPredictionIndex}`);
+            if (selectedWordBox && selectedWordBox.innerText !== "") {
+                soundActionSelect();
+                applyPredictedWord(selectedWordBox.innerText);
+            }
+            endScanningCycle();
+        }
+    }
+
+    function handlePredictionBoxClick(index, event) {
+        if (event) event.stopPropagation();
+        initAudio();
+        if (currentScanMode === "PREDICTION_SCANNING" && currentPredictionIndex === index) {
+            const box = document.getElementById(`pred-${index}`);
+            if (box.innerText !== "") {
+                soundActionSelect();
+                applyPredictedWord(box.innerText);
+                endScanningCycle();
+            }
+        }
+    }
+
+    function processKeyValue(value, colIdx, keyIdx) {
+        if (value === "N/A") {
+            soundError();
+            endScanningCycle();
+            return;
+        }
+
+        const targetEl = document.getElementById(`key-${colIdx}-${keyIdx}`);
+        if (targetEl) {
+            targetEl.classList.remove('key-scan-highlight');
+            targetEl.classList.add('key-selected-flash');
+            setTimeout(() => targetEl.classList.remove('key-selected-flash'), 120);
+        }
+
+        if (value === "PREDICT") {
+            soundColumnSelect();
+            currentScanMode = "PREDICTION_SCANNING";
+            currentPredictionIndex = 0;
+            clearVisualHighlights();
+            highlightPredictionScan(currentPredictionIndex);
+            startTimerScanning();
+            return;
+        }
+
+        if (value === "SPACE" || value === "BACK" || value === "SPEAK" || value === "CLEAR" || value === "COPY") {
+            soundActionSelect();
+        } else {
+            soundKeySelect();
+        }
+
+        const startPos = outputArea.selectionStart;
+        const endPos = outputArea.selectionEnd;
+        let text = outputArea.value;
+
+        if (value === "SPACE") {
+            text = text.substring(0, startPos) + " " + text.substring(endPos);
+            outputArea.value = text;
+            outputArea.selectionStart = outputArea.selectionEnd = startPos + 1;
+        } else if (value === "BACK") {
+            if (startPos > 0 && startPos === endPos) {
+                text = text.substring(0, startPos - 1) + text.substring(endPos);
+                outputArea.value = text;
+                outputArea.selectionStart = outputArea.selectionEnd = startPos - 1;
+            } else if (startPos !== endPos) {
+                text = text.substring(0, startPos) + text.substring(endPos);
+                outputArea.value = text;
+                outputArea.selectionStart = outputArea.selectionEnd = startPos;
+            }
+        } else if (value === "SPEAK") {
+            speakOutputText();
+        } else if (value === "CLEAR") {
+            outputArea.value = "";
+        } else if (value === "COPY") {
+            navigator.clipboard.writeText(outputArea.value.trim());
+            alert("Text copied!");
+        } else {
+            const addedChar = value.toLowerCase();
+            text = text.substring(0, startPos) + addedChar + text.substring(endPos);
+            outputArea.value = text;
+            outputArea.selectionStart = outputArea.selectionEnd = startPos + 1;
+        }
+
+        updateWordPredictions();
+        endScanningCycle();
+    }
+
+    function endScanningCycle() {
+        clearInterval(scanIntervalId);
+        scanIntervalId = null;
+        currentScanMode = "WAITING_FOR_COLUMN";
+        selectedColumnIndex = -1;
+        currentKeyIndex = -1;
+        currentPredictionIndex = -1;
+        clearVisualHighlights();
+    }
+
+    function updateWordPredictions() {
+        const text = outputArea.value;
+        const currentPos = outputArea.selectionStart;
+        const textBeforeCaret = text.substring(0, currentPos);
+        const wordsArray = textBeforeCaret.trim().split(/\s+/);
+        const currentWordStub = wordsArray[wordsArray.length - 1] || "";
+        
+        if (currentWordStub === "") {
+            for (let i = 0; i < 4; i++) document.getElementById(`pred-${i}`).innerText = "";
+            return;
+        }
+
+        const filteredMatches = commonWords.filter(w => w.startsWith(currentWordStub.toLowerCase())).slice(0, 4);
+        
+        for (let i = 0; i < 4; i++) {
+            const box = document.getElementById(`pred-${i}`);
+            box.innerText = filteredMatches[i] ? filteredMatches[i].toUpperCase() : "";
+        }
+    }
+
+    function applyPredictedWord(word) {
+        const text = outputArea.value;
+        const currentPos = outputArea.selectionStart;
+        const textBeforeCaret = text.substring(0, currentPos);
+        const textAfterCaret = text.substring(currentPos);
+        
+        const wordsArray = textBeforeCaret.trim().split(/\s+/);
+        wordsArray.pop(); 
+        wordsArray.push(word.toLowerCase());
+        
+        const replacementBefore = wordsArray.join(" ") + " ";
+        outputArea.value = replacementBefore + textAfterCaret;
+        outputArea.selectionStart = outputArea.selectionEnd = replacementBefore.length;
+        
+        for (let i = 0; i < 4; i++) document.getElementById(`pred-${i}`).innerText = "";
+    }
+
+    function speakOutputText() {
+        if ('speechSynthesis' in window) {
+            const speechString = outputArea.value.trim();
+            if (speechString.length > 0) {
+                const utterance = new SpeechSynthesisUtterance(speechString);
+                window.speechSynthesis.speak(utterance);
+            }
+        }
+    }
+
+    function copyToClipboard(event) {
+        if (event) event.stopPropagation();
+        initAudio();
+        if (outputArea.value.trim().length === 0) {
+            soundError();
+            return;
+        }
+        navigator.clipboard.writeText(outputArea.value.trim()).then(() => {
+            soundActionSelect();
+            alert("Text copied to clipboard!");
+        }).catch(() => {
+            soundError();
+        });
+    }
+
+    function updateIntervalSpeed(val) {
+        intervalSpeed = parseInt(val);
+        if (currentScanMode !== "WAITING_FOR_COLUMN") {
+            startTimerScanning();
+        }
+    }
+
+    function clearText(event) {
+        if (event) event.stopPropagation();
+        initAudio();
+        soundActionSelect();
+        outputArea.value = "";
+        for (let i = 0; i < 4; i++) document.getElementById(`pred-${i}`).innerText = "";
+        endScanningCycle();
+    }
+</script>
+
+</body>
+</html>
+
+```
