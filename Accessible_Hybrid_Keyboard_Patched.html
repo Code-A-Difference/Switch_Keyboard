@@ -1,0 +1,907 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Accessible Hybrid QWERTY Keyboard</title>
+    <style>
+        :root {
+            --bg-color: #f4f7f6;
+            --text-color: #1a252f;
+            --card-color: #ffffff;
+            --accent-color: #3498db;
+            --highlight-color: #e67e22; 
+            --select-color: #2ecc71;
+            --key-bg: #eaeded;
+            --mode-switch-color: #9b59b6;
+            --dwell-color: #e74c3c;
+        }
+
+        /* FORCE ENORMOUS CURSOR EVERYWHERE AT ALL TIMES */
+        *, body, button, select, .key-row-line, .key, .predict-box, .btn, input[type="range"], textarea, div, span {
+            cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='128' height='128' viewBox='0 0 64 64'%3E%3Cpath d='M0 0 L24 48 L34 34 L48 24 Z' fill='%2300ffff' stroke='%23000000' stroke-width='3' stroke-linejoin='miter'/%3E%3C/svg%3E"), auto !important;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            box-sizing: border-box;
+        }
+
+        .container {
+            max-width: 1200px;
+            width: 100%;
+            background: var(--card-color);
+            padding: 30px;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        h1 {
+            text-align: center;
+            margin: 0;
+            color: var(--accent-color);
+            font-size: 2rem;
+        }
+
+        .instructions {
+            text-align: center;
+            color: #5d6d7e;
+            font-size: 1.1rem;
+            margin-bottom: 5px;
+            background: #eef2f5;
+            padding: 12px;
+            border-radius: 8px;
+            font-weight: 600;
+            user-select: none;
+        }
+
+        .text-window-wrapper {
+            position: relative;
+            width: 100%;
+        }
+
+        /* Fixed structural spacing alignments */
+        .mirror-display {
+            width: 100%;
+            height: 160px;
+            border: 4px solid #7f8c8d;
+            border-radius: 12px;
+            padding: 20px;
+            font-size: 36px;
+            font-weight: 800;
+            letter-spacing: normal; /* Fixed alignment space split issue */
+            line-height: 1.4;
+            box-sizing: border-box;
+            background: #ffffff;
+            word-wrap: break-word;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            color: #000000;
+            font-family: inherit;
+        }
+
+        /* Custom caret perfectly sitting right next to the letter node */
+        .custom-caret {
+            display: inline-block;
+            width: 6px;
+            height: 38px;
+            background-color: #e67e22;
+            margin-left: 0px; 
+            margin-right: 0px;
+            vertical-align: middle;
+            animation: blink 0.8s infinite steps(2, start);
+        }
+
+        @keyframes blink {
+            to { visibility: hidden; }
+        }
+
+        .text-window {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            z-index: 2;
+            resize: none;
+            outline: none;
+        }
+
+        .prediction-row {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+            height: 60px;
+            user-select: none;
+        }
+
+        .predict-box {
+            background: #e1f0fa;
+            border: 2px solid transparent;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            font-weight: bold;
+            color: #1b4f72;
+            transition: all 0.1s ease;
+        }
+
+        .keyboard-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            background: #bdc3c7;
+            padding: 20px;
+            border-radius: 16px;
+            user-select: none;
+        }
+
+        .key-row-line {
+            display: grid;
+            grid-template-columns: repeat(11, 1fr);
+            gap: 14px;
+            border-radius: 8px;
+            padding: 4px;
+            transition: background-color 0.15s ease;
+        }
+
+        body.mode-switch .key-row-line:hover {
+            background-color: rgba(52, 152, 219, 0.2);
+        }
+
+        .key {
+            background: var(--key-bg);
+            border-radius: 8px;
+            height: 75px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 26px;
+            font-weight: bold;
+            box-shadow: 0 5px 0 #95a5a6;
+            transition: all 0.1s ease;
+            position: relative;
+            color: #1c2833;
+            pointer-events: none; 
+        }
+
+        .key-row-line.active-row .key,
+        body.mode-manual .key,
+        body.mode-dwell .key {
+            pointer-events: auto; 
+        }
+
+        body.mode-manual .predict-box,
+        body.mode-dwell .predict-box {
+            pointer-events: auto;
+        }
+
+        .key.action {
+            background: #95a5a6;
+            color: #ffffff;
+            font-size: 14px;
+            text-transform: uppercase;
+            box-shadow: 0 5px 0 #7f8c8d;
+        }
+
+        .key.span-2 { grid-column: span 2; }
+        .key.span-3 { grid-column: span 3; }
+
+        .row-selected-scan {
+            background-color: rgba(46, 204, 113, 0.3) !important;
+        }
+
+        .key-scan-highlight {
+            background-color: var(--highlight-color) !important;
+            color: white !important;
+            box-shadow: 0 5px 0 #d35400 !important;
+        }
+
+        .predict-scan-highlight {
+            background-color: var(--highlight-color) !important;
+            color: white !important;
+        }
+
+        .key-selected-flash {
+            background-color: var(--select-color) !important;
+            color: white !important;
+            box-shadow: 0 0px 0 transparent !important;
+            transform: translateY(5px);
+        }
+
+        .key-dwell-hover, .predict-dwell-hover {
+            background-color: var(--dwell-color) !important;
+            color: white !important;
+            box-shadow: 0 2px 0 #c0392b !important;
+        }
+
+        .settings-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #f8f9fa;
+            padding: 15px 24px;
+            border-radius: 10px;
+            border: 1px solid #cbd5e1;
+            user-select: none;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 1.1rem;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            font-weight: bold;
+            font-size: 1rem;
+            border: none;
+            border-radius: 6px;
+            color: white;
+            transition: background 0.2s, transform 0.1s;
+        }
+
+        .btn-copy { background: #2ecc71; }
+        .btn-copy:hover { background: #27ae60; }
+        .btn-clear { background: #94a3b8; }
+        .btn-clear:hover { background: #64748b; }
+        
+        .btn-mode { 
+            background: var(--mode-switch-color); 
+            box-shadow: 0 4px 0 #7d3c98;
+        }
+        .btn-mode:hover { background: #8e44ad; }
+        .btn-mode:active { transform: translateY(2px); box-shadow: 0 2px 0 #7d3c98; }
+
+        .btn-direct-mode {
+            background: #34495e;
+            border: 2px solid #2c3e50;
+        }
+        .btn-direct-mode.active-mode-btn {
+            background: #2ecc71;
+            border-color: #27ae60;
+            box-shadow: 0 0 10px rgba(46, 204, 113, 0.6);
+        }
+
+        select {
+            padding: 8px 16px;
+            font-size: 16px;
+            border-radius: 6px;
+            border: 2px solid #cbd5e1;
+            outline: none;
+        }
+
+        input[type="range"] {
+            width: 130px;
+        }
+    </style>
+</head>
+<body class="mode-switch">
+
+<div class="container" id="main-app">
+    <h1>Wide QWERTY Keyboard (Hybrid Access)</h1>
+    <div class="instructions" id="instruction-panel">🖱️ Step 1: Click a row track to unlock it. <br>💡 Step 2: Confirm when lit orange. Click inside the high-visibility box below to choose your cursor edit location.</div>
+    
+    <div class="text-window-wrapper">
+        <div class="mirror-display" id="mirror-window"><span class="custom-caret"></span></div>
+        <textarea class="text-window" id="output-window" placeholder="TEXT APPEARS HERE..."></textarea>
+    </div>
+
+    <div class="prediction-row" id="prediction-container">
+        <div class="predict-box" id="pred-0" onclick="handlePredictionBoxClick(0, event)"></div>
+        <div class="predict-box" id="pred-1" onclick="handlePredictionBoxClick(1, event)"></div>
+        <div class="predict-box" id="pred-2" onclick="handlePredictionBoxClick(2, event)"></div>
+        <div class="predict-box" id="pred-3" onclick="handlePredictionBoxClick(3, event)"></div>
+    </div>
+
+    <div class="keyboard-grid" id="keyboard-matrix">
+    </div>
+
+    <div class="settings-bar" style="justify-content: center; gap: 20px; background: #eef2f5;">
+        <strong>Direct Mode Selection:</strong>
+        <button class="btn btn-direct-mode active-mode-btn" id="btn-select-switch" onclick="setSpecificMode('SWITCH', event)">Switch Scanning</button>
+        <button class="btn btn-direct-mode" id="btn-select-manual" onclick="setSpecificMode('MANUAL', event)">Direct Manual Click</button>
+        <button class="btn btn-direct-mode" id="btn-select-dwell" onclick="setSpecificMode('DWELL', event)">Dwell Hover Click</button>
+    </div>
+
+    <div class="settings-bar">
+        <div class="control-group">
+            <button class="btn btn-mode" id="btn-toggle-mode" onclick="toggleKeyboardMode(event)">Cycle Mode</button>
+        </div>
+        <div class="control-group" id="speed-control-group">
+            <label for="scan-speed"><strong>Scanning Speed:</strong></label>
+            <select id="scan-speed" onchange="updateIntervalSpeed(this.value)">
+                <option value="1500">Slow (1.5 seconds)</option>
+                <option value="1000" selected>Normal (1.0 second)</option>
+                <option value="700">Fast (0.7 seconds)</option>
+                <option value="400">Expert (0.4 seconds)</option>
+            </select>
+        </div>
+        <div class="control-group" id="dwell-control-group" style="display: none;">
+            <label for="dwell-speed"><strong>Dwell Time:</strong> <span id="dwell-val-display">600</span>ms</label>
+            <input type="range" id="dwell-speed" min="200" max="2000" step="100" value="600" onchange="updateDwellSpeed(this.value)" oninput="document.getElementById('dwell-val-display').innerText=this.value">
+        </div>
+        <div class="control-group">
+            <button class="btn btn-copy" onclick="copyToClipboard(event)">Copy Text</button>
+            <button class="btn btn-clear" onclick="clearText(event)">Clear All</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    let audioCtx = null;
+    let isScanningSelection = false; // Guard variable to kill double-click registration artifacts
+    
+    function initAudio() {
+        if (!audioCtx) {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (audioCtx.state === 'suspended') {
+            audioCtx.resume();
+        }
+    }
+    
+    window.addEventListener('pointerdown', () => { initAudio(); }, { once: false });
+    window.addEventListener('keydown', () => { initAudio(); }, { once: false });
+
+    function playBeep(freq, type = 'sine', duration = 0.1) {
+        initAudio();
+        if (!audioCtx) return;
+        try {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.type = type;
+            osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+            gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+            osc.start();
+            osc.stop(audioCtx.currentTime + duration);
+        } catch(e) {
+            console.log("Audio play blocked.");
+        }
+    }
+
+    function soundColumnSelect() { playBeep(350, 'triangle', 0.12); } 
+    function soundKeySelect() { playBeep(587.33, 'sine', 0.08); }      
+    function soundActionSelect() { playBeep(783.99, 'sine', 0.15); }   
+    function soundError() { playBeep(180, 'sawtooth', 0.15); }         
+
+    const commonWords = [
+        "the", "and", "you", "that", "was", "for", "are", "with", "his", "they", "this", 
+        "have", "from", "one", "had", "word", "what", "some", "here", "there", "when", 
+        "your", "said", "each", "time", "how", "their", "will", "about", "many", "then", 
+        "them", "write", "would", "like", "make", "these", "long", "look", "more", "could", 
+        "go", "come", "did", "my", "sound", "no", "most", "people", "over", "know", "water", 
+        "than", "call", "first", "who", "may", "down", "side", "been", "now", "find", "any", 
+        "new", "work", "part", "take", "get", "place", "made", "live", "where", "after", 
+        "back", "little", "only", "round", "man", "year", "came", "show", "every", "good", 
+        "me", "give", "our", "under", "name", "very", "through", "just", "form", "sentence", 
+        "great", "think", "say", "help", "low", "line", "before", "turn", "cause", "much", 
+        "mean", "move", "right", "boy", "old", "too", "same", "tell", "does", "set", "three", 
+        "want", "air", "well", "also", "play", "small", "end", "put", "home", "hello", "welcome",
+        "please", "thanks", "thank", "yes", "today", "tomorrow", "yesterday", "goodbye", "happy",
+        "sad", "excited", "tired", "hungry", "thirsty", "cold", "hot", "beautiful", "perfect",
+        "awesome", "amazing", "cool", "easy", "hard", "difficult", "simple", "computer", "phone",
+        "keyboard", "screen", "internet", "website", "email", "message", "friend", "family", "house",
+        "room", "school", "class", "teacher", "student", "book", "paper", "pen", "pencil", "music",
+        "song", "game", "movie", "show", "food", "breakfast", "lunch", "dinner", "snack", "water",
+        "milk", "juice", "coffee", "tea", "fruit", "apple", "banana", "bread", "cheese", "meat",
+        "help", "question", "answer", "problem", "solution", "idea", "thought", "feel", "hope",
+        "love", "wish", "need", "should", "could", "might", "must", "shall", "always", "never",
+        "sometimes", "usually", "often", "maybe", "probably", "definitely", "together", "alone",
+        "again", "stop", "start", "pause", "finish", "done", "ready", "open", "close", "left", "right"
+    ];
+
+    const cleanSquareQwerty = [
+        [
+            { value: "Q" }, { value: "W" }, { value: "E" }, { value: "R" }, { value: "T" }, 
+            { value: "Y" }, { value: "U" }, { value: "I" }, { value: "O" }, { value: "P" }, 
+            { value: "BACK" }
+        ],
+        [
+            { value: "A" }, { value: "S" }, { value: "D" }, { value: "F" }, { value: "G" }, 
+            { value: "H" }, { value: "J" }, { value: "K" }, { value: "L" }, { value: "SPACE", span: 2 }
+        ],
+        [
+            { value: "Z" }, { value: "X" }, { value: "C" }, { value: "V" }, { value: "B" }, 
+            { value: "N" }, { value: "M" }, { value: "PREDICT", span: 2 }, { value: "SPEAK", span: 2 }
+        ],
+        [
+            { value: "COPY", span: 3 }, { value: "CLEAR", span: 3 }, 
+            { value: "N/A" }, { value: "N/A" }, { value: "N/A" }, { value: "N/A" }, { value: "N/A" }
+        ]
+    ];
+
+    let operationalMode = "SWITCH"; 
+    let currentScanMode = "WAITING_FOR_COLUMN"; 
+    let selectedRowIndex = -1;
+    let currentKeyIndex = -1;
+    let currentPredictionIndex = -1;
+    let scanIntervalId = null;
+    let intervalSpeed = 1000;
+    let dwellTimerId = null;
+    let dwellSpeed = 600; 
+
+    const gridContainer = document.getElementById('keyboard-matrix');
+    const outputArea = document.getElementById('output-window');
+    const mirrorWindow = document.getElementById('mirror-window');
+    const instructionPanel = document.getElementById('instruction-panel');
+    const speedControlGroup = document.getElementById('speed-control-group');
+    const dwellControlGroup = document.getElementById('dwell-control-group');
+    const btnToggleMode = document.getElementById('btn-toggle-mode');
+
+    function renderTextWithCustomCaret() {
+        const text = outputArea.value;
+        const selStart = outputArea.selectionStart;
+        
+        const textBefore = text.substring(0, selStart);
+        const textAfter = text.substring(selStart);
+        
+        mirrorWindow.innerHTML = '';
+        
+        const nodeBefore = document.createTextNode(textBefore);
+        const nodeAfter = document.createTextNode(textAfter);
+        const caretSpan = document.createElement('span');
+        caretSpan.className = 'custom-caret';
+        
+        mirrorWindow.appendChild(nodeBefore);
+        mirrorWindow.appendChild(caretSpan);
+        mirrorWindow.appendChild(nodeAfter);
+        
+        mirrorWindow.scrollTop = mirrorWindow.scrollHeight;
+    }
+
+    outputArea.addEventListener('input', renderTextWithCustomCaret);
+    outputArea.addEventListener('click', (event) => {
+        event.stopPropagation();
+        initAudio();
+        setTimeout(renderTextWithCustomCaret, 10);
+    });
+    outputArea.addEventListener('keyup', renderTextWithCustomCaret);
+
+    cleanSquareQwerty.forEach((rowArray, rowIdx) => {
+        const rowDiv = document.createElement('div');
+        rowDiv.className = 'key-row-line';
+        rowDiv.id = `row-${rowIdx}`;
+        
+        rowDiv.onclick = function(event) {
+            event.stopPropagation();
+            if (operationalMode === "SWITCH") {
+                isScanningSelection = true; 
+                selectRowManually(rowIdx);
+            }
+        };
+
+        rowArray.forEach((keyObject, keyIdx) => {
+            const keyDiv = document.createElement('div');
+            keyDiv.className = 'key';
+            if (keyObject.value.length > 1) keyDiv.classList.add('action');
+            if (keyObject.span) keyDiv.classList.add(`span-${keyObject.span}`);
+            
+            keyDiv.id = `key-${rowIdx}-${keyIdx}`;
+            keyDiv.innerText = keyObject.value;
+
+            keyDiv.onclick = function(event) {
+                event.stopPropagation();
+                initAudio();
+                if (operationalMode === "MANUAL" || operationalMode === "DWELL") {
+                    processKeyValue(keyObject.value, rowIdx, keyIdx);
+                } else if (operationalMode === "SWITCH") {
+                    if (currentScanMode === "KEY_SCANNING" && selectedRowIndex === rowIdx && currentKeyIndex === keyIdx) {
+                        isScanningSelection = true;
+                        processKeyValue(keyObject.value, rowIdx, keyIdx);
+                    } else {
+                        soundError(); 
+                    }
+                }
+            };
+
+            keyDiv.onmouseenter = function() {
+                if (operationalMode === "DWELL") {
+                    keyDiv.classList.add('key-dwell-hover');
+                    clearTimeout(dwellTimerId);
+                    dwellTimerId = setTimeout(() => {
+                        processKeyValue(keyObject.value, rowIdx, keyIdx);
+                        keyDiv.classList.remove('key-dwell-hover');
+                    }, dwellSpeed);
+                }
+            };
+
+            keyDiv.onmouseleave = function() {
+                if (operationalMode === "DWELL") {
+                    keyDiv.classList.remove('key-dwell-hover');
+                    clearTimeout(dwellTimerId);
+                }
+            };
+
+            rowDiv.appendChild(keyDiv);
+        });
+        gridContainer.appendChild(rowDiv);
+    });
+
+    for (let i = 0; i < 4; i++) {
+        const pBox = document.getElementById(`pred-${i}`);
+        pBox.onmouseenter = function() {
+            if (operationalMode === "DWELL" && pBox.innerText !== "") {
+                pBox.classList.add('predict-dwell-hover');
+                clearTimeout(dwellTimerId);
+                dwellTimerId = setTimeout(() => {
+                    soundActionSelect();
+                    applyPredictedWord(pBox.innerText);
+                    pBox.classList.remove('predict-dwell-hover');
+                }, dwellSpeed);
+            }
+        };
+        pBox.onmouseleave = function() {
+            if (operationalMode === "DWELL") {
+                pBox.classList.remove('predict-dwell-hover');
+                clearTimeout(dwellTimerId);
+            }
+        };
+    }
+
+    function updateModeUI() {
+        endScanningCycle();
+        document.querySelectorAll('.btn-direct-mode').forEach(b => b.classList.remove('active-mode-btn'));
+
+        if (operationalMode === "SWITCH") {
+            document.body.classList.remove("mode-switch","mode-manual","mode-dwell");
+            document.body.classList.add("mode-switch");
+            btnToggleMode.innerText = "Mode: Switch Scanning";
+            document.getElementById('btn-select-switch').classList.add('active-mode-btn');
+            instructionPanel.innerHTML = "🖱️ Step 1: Click a row track to unlock it. <br>💡 Step 2: Confirm when lit orange. Click inside the high-visibility box below to choose your cursor edit location.";
+            speedControlGroup.style.display = "flex";
+            dwellControlGroup.style.display = "none";
+        } else if (operationalMode === "MANUAL") {
+            document.body.classList.remove("mode-switch","mode-manual","mode-dwell");
+            document.body.classList.add("mode-manual");
+            btnToggleMode.innerText = "Mode: Direct Manual Click";
+            document.getElementById('btn-select-manual').classList.add('active-mode-btn');
+            instructionPanel.innerHTML = "🎯 Manual Click Mode Active. Click any key or suggested word box directly.";
+            speedControlGroup.style.display = "none";
+            dwellControlGroup.style.display = "none";
+        } else if (operationalMode === "DWELL") {
+            document.body.classList.remove("mode-switch","mode-manual","mode-dwell");
+            document.body.classList.add("mode-dwell");
+            btnToggleMode.innerText = "Mode: Dwell Hover Click";
+            document.getElementById('btn-select-dwell').classList.add('active-mode-btn');
+            instructionPanel.innerHTML = "⏱️ Dwell Click Mode Active. Rest your cursor pointer over any key to trigger input automatically.";
+            speedControlGroup.style.display = "none";
+            dwellControlGroup.style.display = "flex";
+        }
+        soundActionSelect();
+    }
+
+    function toggleKeyboardMode(event) {
+        if (event) event.stopPropagation();
+        initAudio();
+        if (operationalMode === "SWITCH") operationalMode = "MANUAL";
+        else if (operationalMode === "MANUAL") operationalMode = "DWELL";
+        else operationalMode = "SWITCH";
+        updateModeUI();
+    }
+
+    function setSpecificMode(modeTarget, event) {
+        if (event) event.stopPropagation();
+        initAudio();
+        operationalMode = modeTarget;
+        updateModeUI();
+    }
+
+    function selectRowManually(rowIdx) {
+        initAudio(); 
+        if (currentScanMode === "KEY_SCANNING") {
+            triggerKeyboardSelection();
+            return;
+        }
+
+        soundColumnSelect(); 
+        currentScanMode = "KEY_SCANNING";
+        selectedRowIndex = rowIdx;
+        currentKeyIndex = 0;
+        
+        clearVisualHighlights();
+        
+        const targetRow = document.getElementById(`row-${rowIdx}`);
+        targetRow.classList.add('row-selected-scan');
+        targetRow.classList.add('active-row'); 
+        
+        highlightKeyScan(selectedRowIndex, currentKeyIndex);
+        startTimerScanning();
+    }
+
+    function startTimerScanning() {
+        clearInterval(scanIntervalId);
+        scanIntervalId = setInterval(() => {
+            removeScanHighlights();
+            
+            if (currentScanMode === "KEY_SCANNING") {
+                currentKeyIndex = (currentKeyIndex + 1) % cleanSquareQwerty[selectedRowIndex].length;
+                highlightKeyScan(selectedRowIndex, currentKeyIndex);
+            } else if (currentScanMode === "PREDICTION_SCANNING") {
+                currentPredictionIndex = (currentPredictionIndex + 1) % 4;
+                highlightPredictionScan(currentPredictionIndex);
+            }
+        }, intervalSpeed);
+    }
+
+    function removeScanHighlights() {
+        document.querySelectorAll('.key').forEach(k => k.classList.remove('key-scan-highlight'));
+        document.querySelectorAll('.predict-box').forEach(p => p.classList.remove('predict-scan-highlight'));
+    }
+
+    function clearVisualHighlights() {
+        removeScanHighlights();
+        document.querySelectorAll('.key-row-line').forEach(r => {
+            r.classList.remove('row-selected-scan');
+            r.classList.remove('active-row');
+        });
+    }
+
+    function highlightKeyScan(rowIdx, keyIdx) {
+        const targetKey = document.getElementById(`key-${rowIdx}-${keyIdx}`);
+        if (targetKey) targetKey.classList.add('key-scan-highlight');
+    }
+
+    function highlightPredictionScan(index) {
+        const targetBox = document.getElementById(`pred-${index}`);
+        if (targetBox && targetBox.innerText !== "") {
+            targetBox.classList.add('predict-scan-highlight');
+        }
+    }
+
+    // Fixed Global Window Click handling to eliminate accidental repetitive clicks
+    document.body.onclick = function() {
+        if (operationalMode === "SWITCH") {
+            initAudio();
+            if (isScanningSelection) {
+                isScanningSelection = false; 
+                return;
+            }
+            triggerKeyboardSelection();
+        }
+    };
+
+    window.addEventListener('keydown', (e) => {
+        if (operationalMode === "SWITCH" && e.code === "Space") {
+            if (document.activeElement !== outputArea) {
+                e.preventDefault(); 
+                initAudio();
+                triggerKeyboardSelection();
+            }
+        }
+    });
+
+    function triggerKeyboardSelection() {
+        if (currentScanMode === "KEY_SCANNING") {
+            const selectedValue = cleanSquareQwerty[selectedRowIndex][currentKeyIndex].value;
+            processKeyValue(selectedValue, selectedRowIndex, currentKeyIndex);
+        } else if (currentScanMode === "PREDICTION_SCANNING") {
+            const selectedWordBox = document.getElementById(`pred-${currentPredictionIndex}`);
+            if (selectedWordBox && selectedWordBox.innerText !== "") {
+                soundActionSelect();
+                applyPredictedWord(selectedWordBox.innerText);
+            }
+            endScanningCycle();
+        }
+    }
+
+    function handlePredictionBoxClick(index, event) {
+        if (event) event.stopPropagation();
+        initAudio();
+        
+        if (operationalMode === "MANUAL" || operationalMode === "DWELL") {
+            const box = document.getElementById(`pred-${index}`);
+            if (box && box.innerText !== "") {
+                soundActionSelect();
+                applyPredictedWord(box.innerText);
+            }
+        } else if (operationalMode === "SWITCH") {
+            if (currentScanMode === "PREDICTION_SCANNING" && currentPredictionIndex === index) {
+                isScanningSelection = true;
+                const box = document.getElementById(`pred-${index}`);
+                if (box.innerText !== "") {
+                    soundActionSelect();
+                    applyPredictedWord(box.innerText);
+                    endScanningCycle();
+                }
+            }
+        }
+    }
+
+    function processKeyValue(value, rowIdx, keyIdx) {
+        if (value === "N/A") {
+            soundError();
+            if (operationalMode === "SWITCH") endScanningCycle();
+            return;
+        }
+
+        const targetEl = document.getElementById(`key-${rowIdx}-${keyIdx}`);
+        if (targetEl) {
+            targetEl.classList.remove('key-scan-highlight');
+            targetEl.classList.add('key-selected-flash');
+            setTimeout(() => targetEl.classList.remove('key-selected-flash'), 120);
+        }
+
+        if (value === "PREDICT") {
+            soundColumnSelect();
+            if (operationalMode === "SWITCH") {
+                currentScanMode = "PREDICTION_SCANNING";
+                currentPredictionIndex = 0;
+                clearVisualHighlights();
+                highlightPredictionScan(currentPredictionIndex);
+                startTimerScanning();
+            }
+            return;
+        }
+
+        if (value === "SPACE" || value === "BACK" || value === "SPEAK" || value === "CLEAR" || value === "COPY") {
+            soundActionSelect();
+        } else {
+            soundKeySelect();
+        }
+
+        const startPos = outputArea.selectionStart;
+        const endPos = outputArea.selectionEnd;
+        let text = outputArea.value;
+
+        if (value === "SPACE") {
+            text = text.substring(0, startPos) + " " + text.substring(endPos);
+            outputArea.value = text;
+            outputArea.selectionStart = outputArea.selectionEnd = startPos + 1;
+        } else if (value === "BACK") {
+            if (startPos > 0 && startPos === endPos) {
+                text = text.substring(0, startPos - 1) + text.substring(endPos);
+                outputArea.value = text;
+                outputArea.selectionStart = outputArea.selectionEnd = startPos - 1;
+            } else if (startPos !== endPos) {
+                text = text.substring(0, startPos) + text.substring(endPos);
+                outputArea.value = text;
+                outputArea.selectionStart = outputArea.selectionEnd = startPos;
+            }
+        } else if (value === "SPEAK") {
+            speakOutputText();
+        } else if (value === "CLEAR") {
+            outputArea.value = "";
+        } else if (value === "COPY") {
+            navigator.clipboard.writeText(outputArea.value.trim());
+            alert("Text copied!");
+        } else {
+            const addedChar = value.toLowerCase();
+            text = text.substring(0, startPos) + addedChar + text.substring(endPos);
+            outputArea.value = text;
+            outputArea.selectionStart = outputArea.selectionEnd = startPos + 1;
+        }
+
+        updateWordPredictions();
+        renderTextWithCustomCaret();
+        if (operationalMode === "SWITCH") endScanningCycle();
+    }
+
+    function endScanningCycle() {
+        clearInterval(scanIntervalId);
+        scanIntervalId = null;
+        currentScanMode = "WAITING_FOR_COLUMN";
+        selectedRowIndex = -1;
+        currentKeyIndex = -1;
+        currentPredictionIndex = -1;
+        clearVisualHighlights();
+    }
+
+    function updateWordPredictions() {
+        const text = outputArea.value;
+        const currentPos = outputArea.selectionStart;
+        const textBeforeCaret = text.substring(0, currentPos);
+        const wordsArray = textBeforeCaret.trim().split(/\s+/);
+        const currentWordStub = wordsArray[wordsArray.length - 1] || "";
+        
+        if (currentWordStub === "") {
+            for (let i = 0; i < 4; i++) document.getElementById(`pred-${i}`).innerText = "";
+            return;
+        }
+
+        const filteredMatches = commonWords.filter(w => w.startsWith(currentWordStub.toLowerCase())).slice(0, 4);
+        
+        for (let i = 0; i < 4; i++) {
+            const box = document.getElementById(`pred-${i}`);
+            box.innerText = filteredMatches[i] ? filteredMatches[i].toUpperCase() : "";
+        }
+    }
+
+    function applyPredictedWord(word) {
+        const text = outputArea.value;
+        const currentPos = outputArea.selectionStart;
+        const textBeforeCaret = text.substring(0, currentPos);
+        const textAfterCaret = text.substring(currentPos);
+        
+        const wordsArray = textBeforeCaret.length
+            ? textBeforeCaret.trim().split(/\s+/)
+            : [];
+
+        if (wordsArray.length) {
+            wordsArray.pop();
+        }
+
+        wordsArray.push(word.toLowerCase());
+        
+        const replacementBefore = wordsArray.join(" ") + " ";
+        outputArea.value = replacementBefore + textAfterCaret;
+        outputArea.selectionStart = outputArea.selectionEnd = replacementBefore.length;
+        
+        for (let i = 0; i < 4; i++) document.getElementById(`pred-${i}`).innerText = "";
+        renderTextWithCustomCaret();
+    }
+
+    function speakOutputText() {
+        if ('speechSynthesis' in window) {
+            const speechString = outputArea.value.trim();
+            if (speechString.length > 0) {
+                const utterance = new SpeechSynthesisUtterance(speechString);
+                window.speechSynthesis.cancel();
+                window.speechSynthesis.speak(utterance);
+            }
+        }
+    }
+
+    function copyToClipboard(event) {
+        if (event) event.stopPropagation();
+        initAudio();
+        if (outputArea.value.trim().length === 0) {
+            soundError();
+            return;
+        }
+        navigator.clipboard.writeText(outputArea.value.trim()).then(() => {
+            soundActionSelect();
+            alert("Text copied to clipboard!");
+        }).catch(() => {
+            soundError();
+        });
+    }
+
+    function updateIntervalSpeed(val) {
+        intervalSpeed = parseInt(val);
+        if (operationalMode === "SWITCH" && currentScanMode !== "WAITING_FOR_COLUMN") {
+            startTimerScanning();
+        }
+    }
+
+    // Dwell Time Controller logic remains fully operational
+    function updateDwellSpeed(val) {
+        dwellSpeed = parseInt(val);
+    }
+
+    function clearText(event) {
+        if (event) event.stopPropagation();
+        initAudio();
+        soundActionSelect();
+        outputArea.value = "";
+        for (let i = 0; i < 4; i++) document.getElementById(`pred-${i}`).innerText = "";
+        renderTextWithCustomCaret();
+        if (operationalMode === "SWITCH") endScanningCycle();
+    }
+
+    renderTextWithCustomCaret();
+</script>
+
+</body>
+</html>
